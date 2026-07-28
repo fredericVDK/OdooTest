@@ -5,5 +5,9 @@
     "author": "Frederic",
     "license": "LGPL-3",
     "depends": ["product"],
+    "data": [
+        "views/product_template_views.xml",
+        "data/pigeon_breeds_data.xml",
+    ],
     "installable": True,
 }
