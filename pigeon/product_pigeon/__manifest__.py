@@ -7,6 +7,7 @@
     "depends": ["product"],
     "data": [
         "views/product_template_views.xml",
+        "data/ir_cron_data.xml",
     ],
     "installable": True,
 }
