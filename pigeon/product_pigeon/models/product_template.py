@@ -1,4 +1,5 @@
 import time
+import logging
 
 import requests
 from lxml import html
@@ -6,6 +7,7 @@ from lxml import html
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 
+_logger = logging.getLogger(__name__)
 
 WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
 WIKIDATA_API_URL = "https://www.wikidata.org/w/api.php"
@@ -471,4 +473,15 @@ class ProductTemplate(models.Model):
         if product_values:
             self.create(product_values)
 
+        _logger.info(
+            "Pigeon import finished: %s received, %s created, %s skipped",
+            len(breeds),
+            len(product_values),
+            len(breeds) - len(product_values),
+        )
         return len(product_values)
+    
+    @api.model
+    def _cron_import_pigeon_products(self):
+        return self._import_pigeon_products()
+    
