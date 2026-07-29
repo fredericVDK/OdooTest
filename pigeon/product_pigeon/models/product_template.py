@@ -1,6 +1,7 @@
 import requests
 import time
 
+from lxml import html
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 
@@ -45,7 +46,7 @@ class ProductTemplate(models.Model):
         params = {
             "action": "parse",
             "page": "List of pigeon breeds",
-            "prop": "links",
+            "prop": "text",
             "format": "json",
             "formatversion": 2,
         }
@@ -63,15 +64,19 @@ class ProductTemplate(models.Model):
                 self.env._("Wikipedia could not be reached: %s", error)
             ) from error
 
-        links = response.json().get("parse", {}).get("links", [])
+        page_html = response.json().get("parse", {}).get("text", "")
 
-        titles = {
-            link["title"]
-            for link in links
-            if link.get("ns") == 0
-            and "exists" in link
-            and link.get("title")
-        }
+        document = html.fromstring(page_html)
+
+        titles = set(
+            document.xpath(
+                "//div[contains(@class, 'mw-parser-output')]"
+                "/ul/li/a[1]"
+                "[starts-with(@href, '/wiki/')]"
+                "[not(contains(@class, 'new'))]"
+                "/@title"
+            )
+        )
 
         breeds = []
         sorted_titles = sorted(titles)
@@ -133,3 +138,50 @@ class ProductTemplate(models.Model):
         }
 
         return list(unique_breeds.values())
+    
+    @api.model
+    def _import_pigeon_products(self):
+        breeds = self._fetch_pigeon_breeds()
+
+        api_ids = [
+            breed["api_id"]
+            for breed in breeds
+        ]
+
+        existing_products = self.search(
+            [
+                ("pigeon_api_id", "in", api_ids),
+            ]
+        )
+
+        existing_api_ids = set(
+            existing_products.mapped("pigeon_api_id")
+        )
+
+        new_breeds = [
+            breed
+            for breed in breeds
+            if breed["api_id"] not in existing_api_ids
+        ]
+
+        product_values = []
+
+        for breed in new_breeds:
+            product_values.append(
+                {
+                    "name": breed["name"],
+                    "is_pigeon": True,
+                    "pigeon_api_id": breed["api_id"],
+                    "pigeon_wikidata_id": breed["wikidata_id"],
+                    "pigeon_source_url": breed["source_url"],
+                    "description_sale": breed["description"],
+                    "list_price": 0.0,
+                    "sale_ok": True,
+                    "purchase_ok": False,
+                }
+            )
+
+        if product_values:
+            self.create(product_values)
+
+        return len(product_values)
